@@ -42,7 +42,6 @@ The platform connects customers, restaurant owners, and delivery riders through 
 | Authentication | Supabase Auth |
 | Authorization | Row Level Security (RLS) |
 | Database Operations | Supabase JavaScript Client and PostgreSQL RPCs |
-| Realtime | Supabase Realtime |
 | Package Manager | npm |
 | Deployment Target | Vercel |
 
@@ -51,31 +50,31 @@ The platform connects customers, restaurant owners, and delivery riders through 
 Yumingo follows a frontend-to-Supabase architecture.
 
 ```text
-                  React Application
-                         |
+                 React Application
+                        |
                   Supabase Auth
-                         |
+                        |
                   Role Verification
-                         |
-          +--------------+--------------+
-          |              |              |
-       Customer       Restaurant       Rider
-      Dashboard        Dashboard     Dashboard
-          |              |              |
-          +--------------+--------------+
-                         |
-                   Supabase Client
-                         |
-                   Supabase Platform
-                         |
-             +-----------+-----------+
-             |           |           |
-          Auth       PostgreSQL   Realtime
-                         |
-                    RLS Policies
-                         |
+                        |
+          +-------------+-------------+
+          |             |             |
+       Customer      Restaurant      Rider
+      Dashboard      Dashboard     Dashboard
+          |             |             |
+          +-------------+-------------+
+                        |
+                  Supabase Client
+                        |
+                  Supabase Platform
+                        |
+              +---------+---------+
+              |         |         |
+             Auth   PostgreSQL   Storage
+                        |
+                   RLS Policies
+                        |
                    Database RPCs
-                         |
+                        |
                  Business Operations
 ```
 
@@ -130,6 +129,18 @@ The application uses the following primary PostgreSQL tables:
 
 Prices are stored as integer cents/paise to avoid floating-point precision issues.
 
+### Database Files
+
+The repository includes:
+
+- `supabase/schema.sql` — exported database schema.
+- `supabase/migrations/20261119000000_initial_schema.sql` — initial schema migration.
+- `supabase/migrations/20261119000100_harden_default_privileges.sql` — database function and table privilege hardening.
+
+The initial migration is based on the exported schema and was verified against it using SHA256 hashes.
+
+Both migrations have been successfully applied and validated against a clean local Supabase environment.
+
 ## Reliability and Security
 
 ### Atomic Order Assignment
@@ -163,12 +174,19 @@ The `place_order` function:
 - RLS is enabled on all eight application tables.
 - Database policies restrict access according to user roles and order participation.
 - A database trigger prevents authenticated users from escalating their profile role.
-- Sensitive database functions use controlled execution settings and restricted grants.
+- Application RPC execution permissions are restricted to authenticated users.
+- Table privileges follow a least-privilege approach.
+- Profile updates are restricted to permitted columns.
 - The frontend uses the Supabase publishable key, never a service-role key.
 
-### Realtime Updates
+### Order Updates
 
-Order changes are reflected across relevant application dashboards. The tested workflow includes customer order creation, restaurant status updates, and rider assignment.
+The application currently retrieves order updates through:
+- Initial data fetching.
+- Manual dashboard refresh.
+- Additional data-fetching calls after successful operations.
+
+PostgreSQL Realtime subscriptions are not currently implemented in the frontend.
 
 ## Project Structure
 
@@ -176,6 +194,7 @@ Order changes are reflected across relevant application dashboards. The tested w
 Assignment_Yumingo_Self/
 │
 ├── public/
+│
 ├── src/
 │   ├── components/
 │   │   ├── AppHeader.tsx
@@ -204,6 +223,14 @@ Assignment_Yumingo_Self/
 │   ├── TESTING.md
 │   └── DEPLOYMENT.md
 │
+├── supabase/
+│   ├── migrations/
+│   │   ├── 20261119000000_initial_schema.sql
+│   │   └── 20261119000100_harden_default_privileges.sql
+│   ├── .gitignore
+│   ├── config.toml
+│   └── schema.sql
+│
 ├── .env
 ├── .gitignore
 ├── index.html
@@ -218,17 +245,19 @@ Assignment_Yumingo_Self/
 
 - Node.js 20 or later.
 - npm.
-- A configured Supabase project.
 - Git.
+- A configured Supabase project.
+
+For local database development:
+- Docker Desktop.
+- Supabase CLI.
 
 ### 1. Clone the repository
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
-cd Assignment_Yumingo_Self
+git clone https://github.com/Animesht1008/Yumingo_Assignment.git
+cd Yumingo_Assignment
 ```
-
-Replace the placeholder with your actual GitHub repository URL.
 
 ### 2. Install dependencies
 
@@ -251,18 +280,25 @@ Never commit `.env` or expose a Supabase service-role key in frontend code.
 
 ### 4. Configure Supabase
 
-Before running the application, ensure that your Supabase project has:
+For an existing hosted Supabase project, ensure that the required application tables, RLS policies, database triggers, indexes, RPC functions, and authentication configuration are present.
 
-- Required application tables and relationships.
-- Configured RLS policies.
-- Required database triggers and indexes.
-- Required PostgreSQL RPC functions.
-- Authentication enabled.
-- Appropriate Realtime configuration.
+For local database development, initialize and start the local Supabase environment:
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the system design.
+```bash
+npx supabase start
+```
 
-**Note:** The current repository contains an `accept_order` SQL backup, not a complete set of database migrations. A fresh Supabase project requires the remaining database objects to be provisioned separately.
+Apply the version-controlled migrations to the local database:
+
+```bash
+npx supabase db reset
+```
+
+This recreates the local database and applies the migration files. It removes existing local database data.
+
+**Important:** These commands should be used with the local Supabase environment. Do not use database reset commands against a hosted project.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/TESTING.md](docs/TESTING.md) for additional details.
 
 ### 5. Start the development server
 
@@ -287,7 +323,7 @@ http://localhost:5173
 
 ## Testing
 
-The application has been tested against an actual Supabase environment.
+The application has been tested against both local and hosted Supabase environments.
 
 Verified areas include:
 
@@ -299,7 +335,8 @@ Verified areas include:
 - Concurrent rider assignment.
 - Idempotent order-acceptance retries.
 - RLS and database privilege checks.
-- Cross-role Realtime updates.
+- Clean local database migration validation.
+- Hosted application regression testing.
 - ESLint and production build.
 
 Run the frontend checks:
@@ -309,31 +346,33 @@ npm run lint
 npm run build
 ```
 
-For detailed test scenarios and results, see [`docs/TESTING.md`](docs/TESTING.md).
+For detailed test scenarios and results, see [docs/TESTING.md](docs/TESTING.md).
 
 ## Documentation
 
 | Document | Description |
 |---|---|
 | [Architecture](docs/ARCHITECTURE.md) | System architecture, components, database design, and security |
-| [Testing](docs/TESTING.md) | Functional, concurrency, idempotency, security, and build verification |
+| [Testing](docs/TESTING.md) | Functional, concurrency, idempotency, security, migration, and build verification |
 | [Deployment](docs/DEPLOYMENT.md) | Supabase configuration and Vercel deployment instructions |
 
 ## Known Limitations
 
 - Idempotency keys are currently held in frontend memory and do not survive page reloads.
 - Runtime verification of actual network-interruption recovery remains inconclusive.
-- The repository does not yet contain a complete version-controlled database migration history.
+- PostgreSQL Realtime subscriptions are not implemented in the frontend.
 - Formal load and stress testing has not been performed.
+- Production Vercel deployment and its final verification remain pending.
+- Database migrations have been validated locally but have not been applied to the hosted Supabase project through this migration workflow.
 
 These limitations are documented to distinguish verified functionality from future improvements.
 
 ## Future Improvements
 
 - Persist idempotency keys across browser reloads.
-- Add complete database migration and seed scripts.
 - Add automated integration and end-to-end tests.
 - Introduce load and stress testing.
+- Implement PostgreSQL Realtime subscriptions for order updates.
 - Improve production monitoring and observability.
 - Complete production deployment and verification.
 

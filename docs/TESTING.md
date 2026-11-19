@@ -7,16 +7,18 @@ This document describes the testing and verification performed for the Yumingo f
 Testing focused on:
 
 - Authentication and role-based access.
-- Customer order placement.
+- Customer order placement and order history.
 - Restaurant order management.
 - Rider order acceptance and delivery progression.
 - Concurrent order assignment.
 - Idempotency and duplicate-request protection.
 - Row Level Security (RLS).
+- Database function and table privileges.
 - Cross-role order visibility.
+- Database migration reproducibility.
 - Frontend linting and production builds.
 
-The tests were performed against an actual Supabase environment, using separate customer, restaurant-owner, and rider accounts.
+Testing was performed using both a local Supabase environment and the hosted Supabase project. These environments were used for different purposes and are distinguished throughout this document.
 
 ## 2. Test Environment
 
@@ -27,9 +29,10 @@ The tests were performed against an actual Supabase environment, using separate 
 | Database | PostgreSQL |
 | Authentication | Supabase Auth |
 | Authorization | PostgreSQL RLS |
-| Browser | Microsoft Edge |
+| Browser | Microsoft Edge, Chrome |
 | Runtime | Node.js v20.20.0 |
 | Package manager | npm 11.8.0 |
+| Local database | Supabase CLI with Docker |
 
 ### Test accounts
 
@@ -71,7 +74,7 @@ The test environment included Green Leaf Restaurant and sample menu items.
 | Add items to cart | Selected items appear in cart | PASS |
 | Update quantity | Cart quantity and total update | PASS |
 | Remove cart item | Item is removed when quantity reaches zero | PASS |
-| Place order | Order is created through `place_order` RPC | PASS |
+| Place order | Order is created through `place_order` RPC | PASS (earlier functional test) |
 | Verify order total | Database calculates and stores the correct total | PASS |
 | View order history | Customer sees their own orders | PASS |
 | View order status | Current order status is displayed | PASS |
@@ -90,6 +93,8 @@ Expected total: ₹430.
 The database stored `total_cents = 43000`, and the corresponding order items were verified.
 
 A database-side pricing issue was also identified and corrected during testing. The order-creation function was updated to calculate the total before inserting the order, rather than initially inserting an invalid zero total.
+
+**Post-permission-hardening regression:** Customer authentication, restaurant discovery, menu loading, and order-history retrieval were successfully verified against the hosted Supabase project. A new customer order was not placed during this latest regression round.
 
 ### 3.3 Restaurant Owner Application
 
@@ -111,6 +116,8 @@ The following status progression was verified:
 
 Database triggers validate permitted order-status transitions.
 
+**Post-permission-hardening regression:** The restaurant owner successfully loaded existing orders and transitioned order `4b3a35a3` from `accepted` to `ready_for_pickup` in the hosted environment. Dashboard summary counts updated accordingly.
+
 ### 3.4 Rider Application
 
 **Objective:** Verify order discovery, assignment, pickup, and delivery completion.
@@ -130,7 +137,26 @@ A complete delivery lifecycle was verified:
 
 `ready_for_pickup → assigned → picked_up → delivered`
 
-The database was queried after completion to verify the final order status, rider assignment, assignment status, and completion timestamp.
+**Post-permission-hardening regression:** The rider successfully accepted, picked up, and delivered an existing hosted test order.
+
+The final order and assignment records were verified directly in Supabase.
+
+Verified order:
+
+`4b3a35a3-be46-4ead-b96a-0f69d116a40b`
+
+Final database state:
+
+| Field | Value |
+|---|---|
+| Order status | `delivered` |
+| Rider ID | `4be2081e-e0f1-47a0-b90e-17939025efb2` |
+| Assignment status | `completed` |
+| Idempotency key | Present |
+| Assigned at | 2026-11-19 11:27:20 UTC |
+| Completed at | 2026-11-19 11:28:32 UTC |
+
+This confirms that both the order and corresponding assignment reached their expected terminal states.
 
 ## 4. Concurrency Testing
 
@@ -216,6 +242,8 @@ RLS was confirmed enabled on all eight application tables:
 
 ### 6.2 Policy verification
 
+A local migration validation confirmed that all 20 RLS policies were created successfully.
+
 The following access restrictions were reviewed:
 
 | Area | Verification |
@@ -232,7 +260,7 @@ The following access restrictions were reviewed:
 
 ### 6.3 Database function permissions
 
-The following functions were reviewed:
+The following application functions were reviewed:
 
 - `place_order`
 - `accept_order`
@@ -240,30 +268,52 @@ The following functions were reviewed:
 - `get_my_role`
 - `owns_restaurant`
 
-Execution permissions were verified for authenticated users and checked to ensure anonymous users did not have execution access to these functions.
+Execution permissions were verified in the local database:
 
-### 6.4 Privilege hardening
+- `anon` cannot execute these functions.
+- `authenticated` can execute these functions.
 
-Unnecessary `TRUNCATE` and `TRIGGER` table privileges were revoked from the `anon` and `authenticated` roles.
+PostgreSQL's default `PUBLIC` execution privilege was also revoked to prevent anonymous users from inheriting execution access.
 
-A follow-up verification query returned no remaining grants for these privileges on the application tables.
+The two trigger functions remained installed and operational after function privilege hardening.
 
-Existing database triggers remained installed and operational.
+### 6.4 Table privilege hardening
 
-A separate migration was subsequently prepared to revoke unnecessary default privileges for future tables created by the `postgres` role in the `public` schema. This migration has been created locally but has not yet been applied to the hosted database.
+The initial privilege audit identified unnecessarily broad table-level permissions for `anon` and `authenticated`.
+
+A corrective migration was prepared to:
+
+- Revoke all existing table privileges from `anon` and `authenticated`.
+- Grant only the table operations required by the application's RLS policies.
+- Restrict profile updates to the `full_name` and `phone` columns.
+- Remove direct table-level update access to `profiles.role`.
+- Revoke unnecessary `REFERENCES`, `TRIGGER`, and `TRUNCATE` privileges.
+- Restrict default privileges for future tables created by the `postgres` role.
+
+The final local permission verification confirmed:
+
+- `anon` has no table-level privileges on the eight application tables.
+- `authenticated` has only the intended table-level operations.
+- Neither role has unnecessary `REFERENCES`, `TRIGGER`, `TRUNCATE`, or `MAINTAIN` privileges.
+- Authenticated users cannot update `profiles.role`.
+- Authenticated users can update `profiles.full_name` and `profiles.phone`.
+- Anonymous users cannot read or update profiles.
+
+The sequence permission audit returned no rows for `anon` and `authenticated` in the public schema. No public-schema sequences requiring direct grants were present.
 
 ### 6.5 Role regression checks
 
-After the permission changes, customer, restaurant-owner, and rider workflows were tested again.
+After the local permission-hardening migration was validated, the hosted application was regression-tested.
 
 Verified operations included:
 
-- Customer dashboard loading and menu visibility.
-- Restaurant order retrieval and status updates.
+- Customer authentication, restaurant discovery, menu loading, and order history.
+- Restaurant-owner authentication, order retrieval, and status updates.
+- Rider authentication and available-delivery retrieval.
 - Rider order acceptance.
 - Rider pickup and delivery completion.
 
-**Result:** PASS for the tested application workflows after privilege hardening.
+**Result:** PASS for the tested hosted application workflows.
 
 This is a focused RLS and authorization review, not a complete penetration test.
 
@@ -274,7 +324,7 @@ This is a focused RLS and authorization review, not a complete penetration test.
 ### End-to-end scenario
 
 1. Customer places an order.
-2. Restaurant owner retrieves the new order.
+2. Restaurant owner retrieves the order.
 3. Restaurant owner accepts and prepares the order.
 4. Customer retrieves the updated order status.
 5. Restaurant owner marks the order ready for pickup.
@@ -284,7 +334,7 @@ This is a focused RLS and authorization review, not a complete penetration test.
 
 **Observed result:**
 
-The cross-role workflow was successfully verified through database queries and dashboard data refreshes.
+Cross-role order visibility was successfully verified through database queries and dashboard data refreshes.
 
 The relevant order records and statuses were visible to the appropriate roles when their dashboards retrieved the latest database state.
 
@@ -322,7 +372,7 @@ The application should therefore not claim that all network-failure scenarios ha
 
 ## 9. Frontend Quality Checks
 
-The following commands were executed after the rider dashboard cleanup.
+The following commands were executed after the rider dashboard cleanup and database permission-hardening work.
 
 ### ESLint
 
@@ -342,32 +392,63 @@ npm run build
 
 **Result:** PASS
 
-The build completed successfully:
+The latest build completed successfully:
 
 ```text
 vite v8.3.8 building client environment for production...
 ✓ 65 modules transformed.
-✓ built in 262ms
+dist/index.html                   0.47 kB
+dist/assets/index-BaKegckA.css    7.96 kB
+dist/assets/index-CmEUEZpE.js   448.48 kB
+✓ built in 163ms
 ```
 
 TypeScript compilation and Vite production bundling both completed successfully.
 
-## 10. Database Migration Preparation
+## 10. Database Migration Validation
 
 The existing Supabase schema was exported into `supabase/schema.sql`.
 
 The exported schema contains the application's tables, functions, triggers, indexes, constraints, RLS policies, and grants.
 
-Two local migration files were prepared:
+Two migration files were prepared:
 
 | Migration | Purpose |
 |---|---|
 | `20261119000000_initial_schema.sql` | Initial exported schema |
-| `20261119000100_harden_default_privileges.sql` | Restricts unnecessary default privileges on future tables |
+| `20261119000100_harden_default_privileges.sql` | Function execution hardening, least-privilege grants for existing tables, profile column restrictions, and default privilege hardening |
 
 The initial schema migration was verified against the original export using SHA256 hashes.
 
-**Status:** Migration files have been created and verified locally. They have not yet been validated by applying them to a clean Supabase environment.
+### Local clean-environment validation
+
+A local Supabase stack was started using Docker and Supabase CLI.
+
+The following command was executed successfully:
+
+```powershell
+npx supabase db reset
+```
+
+Both migrations were applied successfully to the recreated local database.
+
+The following checks were performed:
+
+| Validation | Result |
+|---|---|
+| Eight application tables created | PASS |
+| RLS enabled on all eight tables | PASS |
+| Seven public application/trigger functions created | PASS |
+| Critical function execution permissions | PASS |
+| Two database triggers installed and enabled | PASS |
+| Twenty RLS policies created | PASS |
+| Excessive table privileges revoked | PASS |
+| Profile column-level update restrictions | PASS |
+| Sequence privilege inspection | PASS — no public-schema sequences requiring direct grants |
+
+The migration reset and validation were performed against the local Docker database, not the hosted Supabase project.
+
+**Migration status:** Both migration files were successfully applied and validated in a clean local Supabase environment. They have not been applied to the hosted database through this migration workflow.
 
 ## 11. Final Verification Summary
 
@@ -380,13 +461,18 @@ The initial schema migration was verified against the original export using SHA2
 | Concurrent rider assignment | PASS |
 | Idempotency verification | PASS |
 | RLS and authorization review | PASS for reviewed checks |
-| Privilege hardening regression | PASS |
+| Function execution privilege hardening | PASS |
+| Table privilege hardening | PASS |
+| Profile column restrictions | PASS |
+| Local clean migration reset | PASS |
+| Hosted application regression | PASS for tested workflows |
 | Cross-role order visibility | PASS |
 | PostgreSQL Realtime subscriptions | NOT IMPLEMENTED |
 | Network interruption recovery | INCONCLUSIVE |
 | ESLint | PASS |
 | TypeScript and production build | PASS |
-| Migration preparation | CREATED, NOT APPLIED |
+| Migration application to clean local database | PASS |
+| Migration application to hosted database | NOT PERFORMED |
 
 ## 12. Known Testing Limitations
 
@@ -396,14 +482,17 @@ The initial schema migration was verified against the original export using SHA2
 4. No formal load, stress, or high-concurrency performance benchmark was performed.
 5. The security review was focused on RLS, database function permissions, role restrictions, and application workflows. It was not a comprehensive penetration test.
 6. PostgreSQL Realtime subscriptions for order updates have not been implemented in the frontend.
-7. The prepared database migrations have not yet been validated against a clean Supabase environment.
+7. The prepared database migrations have been validated against a clean local Supabase environment but have not been applied to the hosted Supabase project through this workflow.
+8. A new customer order was not created during the latest post-hardening hosted regression round; order placement had been verified in earlier functional testing.
 
 ## 13. Conclusion
 
-The main customer, restaurant-owner, and rider workflows were successfully exercised against the Supabase environment.
+The main customer, restaurant-owner, and rider workflows were successfully exercised against the hosted Supabase environment.
 
-The implementation also passed the tested concurrency and idempotency scenarios, the reviewed database permission-hardening regression checks, and the frontend lint and production-build checks.
+The implementation also passed the tested concurrency and idempotency scenarios, the reviewed database permission-hardening checks, and the frontend lint and production-build checks.
 
-Cross-role order visibility was verified using database queries and dashboard refreshes. Native PostgreSQL Realtime subscription behaviour has not yet been implemented or verified.
+Both database migrations were successfully applied to a clean local Supabase environment. The validation confirmed the expected schema, RLS policies, database functions, triggers, and least-privilege permissions.
+
+Cross-role order visibility was verified using database queries and dashboard refreshes. Native PostgreSQL Realtime subscription behaviour has not been implemented or verified.
 
 The remaining limitations are documented above so that the verification results accurately reflect the scope of testing performed.
