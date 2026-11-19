@@ -22,6 +22,7 @@ interface RestaurantOrder extends DatabaseOrder {
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
+  const authenticatedUserId = session?.user.id
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -58,7 +59,7 @@ function App() {
 
   // Verify the authenticated user's role and permissions.
   useEffect(() => {
-    if (!session) {
+    if (!authenticatedUserId) {
       return
     }
 
@@ -72,8 +73,6 @@ function App() {
       setRestaurantId(null)
 
       try {
-        const authenticatedUserId = session!.user.id
-
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
@@ -167,7 +166,7 @@ function App() {
     return () => {
       isActive = false
     }
-  }, [session])
+  }, [authenticatedUserId])
 
   // Fetch orders belonging to the authenticated restaurant.
   const loadRestaurantOrders = useCallback(async () => {
