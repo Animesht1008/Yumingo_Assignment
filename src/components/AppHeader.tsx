@@ -30,6 +30,17 @@ function AppHeader({ onLogout }: AppHeaderProps) {
           type="button"
           className="logout-button"
           onClick={onLogout}
+          style={{
+            backgroundColor: '#14765B',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '10px 18px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'background-color 0.2s ease',
+          }}
         >
           Sign Out
         </button>
