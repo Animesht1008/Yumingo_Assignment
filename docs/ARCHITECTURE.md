@@ -6,11 +6,13 @@ Yumingo is a role-based food ordering and delivery application built with React,
 
 The application supports three user roles:
 
-- **Customer:** discovers restaurants, browses menus, places orders, and tracks order status.
-- **Restaurant Owner:** views incoming orders and progresses them through preparation.
-- **Delivery Rider:** views available pickup requests, accepts deliveries, and updates delivery progress.
+- **Customer:** Discovers restaurants, browses menus, places orders, and tracks order status.
+- **Restaurant Owner:** Views incoming orders and progresses them through preparation.
+- **Delivery Rider:** Views available pickup requests, accepts deliveries, and updates delivery progress.
 
-Supabase provides authentication, PostgreSQL data storage, Row Level Security (RLS), database functions, and realtime capabilities.
+Supabase provides authentication, PostgreSQL data storage, Row Level Security (RLS), and database functions.
+
+The application currently uses explicit data fetching and manual refresh mechanisms. Supabase Realtime is available as a platform capability but is not currently integrated into the frontend's order-update workflow.
 
 ## 2. Technology Stack
 
@@ -23,7 +25,7 @@ Supabase provides authentication, PostgreSQL data storage, Row Level Security (R
 | Authentication | Supabase Auth |
 | Authorization | PostgreSQL RLS policies and database functions |
 | Database operations | Supabase JavaScript client, PostgreSQL RPCs |
-| Realtime capability | Supabase Realtime |
+| Realtime capability | Supabase Realtime (not currently integrated into frontend order subscriptions) |
 | Deployment target | Vercel (planned) |
 
 ## 3. High-Level Architecture
@@ -48,17 +50,18 @@ The frontend communicates with Supabase using the Supabase JavaScript client.
                         |
                  Supabase Platform
                         |
-          +-------------+-------------+
-          |             |             |
-       Supabase       PostgreSQL    Realtime
-         Auth          Database
-                         |
-                 RLS + Database RPCs
-                         |
-                Business Transactions
+             +----------+----------+
+             |                     |
+         Supabase Auth         PostgreSQL
+                                   |
+                              RLS + RPCs
+                                   |
+                         Business Transactions
 ```
 
 The frontend handles presentation, user interaction, and data fetching. Sensitive business operations, including order creation, rider assignment, and delivery-status validation, are enforced at the database layer.
+
+Dashboard data is retrieved through explicit Supabase queries. Users can manually refresh data, and relevant operations trigger additional queries to retrieve the latest database state.
 
 ## 4. Frontend Structure
 
@@ -265,20 +268,56 @@ The rider acceptance workflow includes:
 
 After uncertain delivery-status updates, the dashboard reloads database state to avoid relying solely on the response received by the client.
 
-## 12. Realtime Behaviour
+## 12. Data Fetching and Refresh Behaviour
 
-Realtime behaviour was validated across the customer, restaurant, and rider workflows.
+The current application uses explicit Supabase queries to retrieve dashboard data. It does not currently implement PostgreSQL change subscriptions or Supabase Broadcast subscriptions for order updates.
 
-The observed workflow included:
+### Customer dashboard
 
-- A newly placed customer order becoming visible to the restaurant.
-- Restaurant status changes appearing in the customer experience.
-- Ready-for-pickup orders becoming available to riders.
-- Rider assignment appearing in the customer's order status.
+- Loads open restaurants and customer order history when the dashboard initializes.
+- Loads menu items when the selected restaurant changes.
+- Reloads order history after successfully placing an order.
+- Provides a manual Refresh Orders action.
 
-The exact client subscription configuration should be documented alongside the relevant implementation code before describing the frontend subscription mechanism in detail.
+### Restaurant dashboard
 
-## 13. Deployment Architecture
+- Loads restaurant orders after restaurant ownership is verified.
+- Reloads orders after a successful status update.
+- Provides a manual Refresh action.
+
+### Rider dashboard
+
+- Loads available and assigned orders when the dashboard initializes.
+- Reloads orders after acceptance, pickup, delivery completion, or uncertain operation outcomes.
+- Provides a manual Refresh action.
+
+The Supabase `supabase_realtime` publication exists in the database, but the inspected publication-table query returned no registered tables. The frontend source inspection also found no `postgres_changes` or Broadcast subscription implementation.
+
+**Future enhancement:** Integrate Supabase Realtime subscriptions for relevant order and assignment changes. This would allow dashboards to receive database updates without requiring manual refreshes or additional queries.
+
+Until that integration is implemented and tested, the application should be described as using query-based data fetching and manual refresh rather than live database subscriptions.
+
+## 13. Database Schema Management
+
+The repository now contains an exported database schema and an initial migration structure:
+
+```text
+supabase/
+├── migrations/
+│   ├── 20261119000000_initial_schema.sql
+│   └── 20261119000100_harden_default_privileges.sql
+└── schema.sql
+```
+
+- `schema.sql` preserves the exported database schema.
+- `20261119000000_initial_schema.sql` is a copy of the exported schema.
+- `20261119000100_harden_default_privileges.sql` revokes unnecessary default privileges for future tables created by the `postgres` role in the `public` schema.
+
+The initial schema export includes application tables, functions, triggers, indexes, constraints, RLS policies, and grants.
+
+**Migration status:** The files have been created and verified locally. They have not yet been validated by applying them to a clean Supabase environment. Environment-specific ownership, grants, managed Supabase objects, and migration ordering must be reviewed before using them to initialize another project.
+
+## 14. Deployment Architecture
 
 The planned deployment separates the frontend hosting environment from the Supabase backend.
 
@@ -290,15 +329,16 @@ The planned deployment separates the frontend hosting environment from the Supab
 
 The production frontend must use production Supabase credentials and must not include privileged service-role credentials.
 
-## 14. Known Limitations and Follow-up Work
+## 15. Known Limitations and Follow-up Work
 
-1. The idempotency test UI currently contains hardcoded test identities and order details. It should be removed before final submission.
-2. Idempotency keys are stored in component memory and do not survive a page reload.
-3. Network-failure recovery has implementation support, but a conclusive runtime offline-failure test has not yet been established.
-4. The repository currently contains only a backup SQL file for `accept_order`; the full database schema, policies, triggers, and RPC definitions should be consolidated into version-controlled migration files.
-5. The exact frontend Realtime subscription implementation should be confirmed before documenting its internal mechanics.
+1. Idempotency keys are stored in component memory and do not survive a page reload.
+2. Network-failure recovery has implementation support, but a conclusive runtime offline-failure test has not yet been established.
+3. The database migration files have not yet been validated against a clean Supabase environment.
+4. The exported schema and migration files require review for environment-specific ownership, grants, and Supabase-managed configuration.
+5. Supabase Realtime subscriptions for order updates are not currently implemented in the frontend.
+6. Vercel deployment and production-environment validation remain pending.
 
-## 15. Engineering Verification
+## 16. Engineering Verification
 
 The project has been tested through role-based workflows:
 
@@ -308,7 +348,7 @@ The project has been tested through role-based workflows:
 - Concurrent rider acceptance testing.
 - Idempotent retry testing.
 - RLS and application-role regression checks.
-- Cross-role order status visibility and realtime workflow checks.
+- Cross-role order visibility through database queries and dashboard refreshes.
 
 The project also passed the recorded frontend lint and production build checks.
 

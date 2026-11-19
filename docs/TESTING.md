@@ -13,7 +13,7 @@ Testing focused on:
 - Concurrent order assignment.
 - Idempotency and duplicate-request protection.
 - Row Level Security (RLS).
-- Realtime updates across application roles.
+- Cross-role order visibility.
 - Frontend linting and production builds.
 
 The tests were performed against an actual Supabase environment, using separate customer, restaurant-owner, and rider accounts.
@@ -37,10 +37,10 @@ Separate test identities were used to verify role-specific access:
 
 | Role | Test account |
 |---|---|
-| Customer | customer@example.com |
-| Restaurant Owner | restaurant@example.com |
-| Rider 1 | animesh.rider@example.com |
-| Rider 2 | rider2@test.com |
+| Customer | Dedicated customer test account |
+| Restaurant Owner | Dedicated restaurant-owner test account |
+| Rider 1 | Dedicated rider test account |
+| Rider 2 | Separate rider test account |
 
 The test environment included Green Leaf Restaurant and sample menu items.
 
@@ -151,7 +151,7 @@ The database was queried after completion to verify the final order status, ride
 
 **Observed result:**
 
-<badge color="success">PASS</badge>
+**PASS**
 
 Rider 1 won the tested race. Supabase confirmed that only one active assignment existed for the order.
 
@@ -177,7 +177,7 @@ Both requests should return the same assignment ID, with exactly one active assi
 
 **Observed result:**
 
-<badge color="success">PASS</badge>
+**PASS**
 
 Both requests returned the same assignment ID:
 
@@ -250,6 +250,8 @@ A follow-up verification query returned no remaining grants for these privileges
 
 Existing database triggers remained installed and operational.
 
+A separate migration was subsequently prepared to revoke unnecessary default privileges for future tables created by the `postgres` role in the `public` schema. This migration has been created locally but has not yet been applied to the hosted database.
+
 ### 6.5 Role regression checks
 
 After the permission changes, customer, restaurant-owner, and rider workflows were tested again.
@@ -265,28 +267,42 @@ Verified operations included:
 
 This is a focused RLS and authorization review, not a complete penetration test.
 
-## 7. Realtime Testing
+## 7. Cross-Role Order Visibility and Refresh Testing
 
-**Objective:** Verify that relevant order changes become visible across application roles without requiring manual page refreshes.
+**Objective:** Verify that order information and status changes can be retrieved by the relevant application roles as the order progresses through its lifecycle.
 
 ### End-to-end scenario
 
 1. Customer places an order.
-2. Restaurant dashboard receives and displays the new order.
-3. Restaurant accepts and prepares the order.
-4. Customer dashboard reflects the updated status.
-5. Restaurant marks the order ready for pickup.
-6. Rider dashboard displays the available delivery.
+2. Restaurant owner retrieves the new order.
+3. Restaurant owner accepts and prepares the order.
+4. Customer retrieves the updated order status.
+5. Restaurant owner marks the order ready for pickup.
+6. Rider retrieves the available delivery.
 7. Rider accepts the order.
-8. Customer dashboard reflects the assignment.
+8. Customer retrieves the updated assignment status.
 
 **Observed result:**
 
-<badge color="success">PASS</badge>
+The cross-role workflow was successfully verified through database queries and dashboard data refreshes.
 
-The cross-role workflow was observed successfully. New orders and subsequent status changes became visible in the relevant dashboards without manual refresh.
+The relevant order records and statuses were visible to the appropriate roles when their dashboards retrieved the latest database state.
 
-This documents the observed application behaviour; it does not establish a load or scalability benchmark for Realtime.
+### Realtime implementation status
+
+The database contains a `supabase_realtime` publication. However, inspection of `pg_publication_tables` returned no registered tables.
+
+Frontend source inspection also found no `postgres_changes` or Supabase Broadcast subscriptions for order updates.
+
+The current dashboards use:
+
+- Initial data fetching.
+- Explicit manual refresh actions.
+- Additional data-fetching calls after relevant successful operations.
+
+Therefore, the observed cross-role workflow is a functional order-visibility test, **not a verified PostgreSQL Realtime subscription test**.
+
+Supabase Realtime integration remains a potential future enhancement.
 
 ## 8. Error Handling and Network Resilience
 
@@ -336,7 +352,24 @@ vite v8.3.8 building client environment for production...
 
 TypeScript compilation and Vite production bundling both completed successfully.
 
-## 10. Final Verification Summary
+## 10. Database Migration Preparation
+
+The existing Supabase schema was exported into `supabase/schema.sql`.
+
+The exported schema contains the application's tables, functions, triggers, indexes, constraints, RLS policies, and grants.
+
+Two local migration files were prepared:
+
+| Migration | Purpose |
+|---|---|
+| `20261119000000_initial_schema.sql` | Initial exported schema |
+| `20261119000100_harden_default_privileges.sql` | Restricts unnecessary default privileges on future tables |
+
+The initial schema migration was verified against the original export using SHA256 hashes.
+
+**Status:** Migration files have been created and verified locally. They have not yet been validated by applying them to a clean Supabase environment.
+
+## 11. Final Verification Summary
 
 | Testing area | Result |
 |---|---|
@@ -348,23 +381,29 @@ TypeScript compilation and Vite production bundling both completed successfully.
 | Idempotency verification | PASS |
 | RLS and authorization review | PASS for reviewed checks |
 | Privilege hardening regression | PASS |
-| Realtime cross-role workflow | PASS |
+| Cross-role order visibility | PASS |
+| PostgreSQL Realtime subscriptions | NOT IMPLEMENTED |
 | Network interruption recovery | INCONCLUSIVE |
 | ESLint | PASS |
 | TypeScript and production build | PASS |
+| Migration preparation | CREATED, NOT APPLIED |
 
-## 11. Known Testing Limitations
+## 12. Known Testing Limitations
 
 1. The network interruption recovery scenario has not been conclusively verified at runtime.
 2. Idempotency retry keys are held in component memory and are not persisted across page reloads.
 3. Testing was performed with a limited set of test accounts and sample orders.
 4. No formal load, stress, or high-concurrency performance benchmark was performed.
 5. The security review was focused on RLS, database function permissions, role restrictions, and application workflows. It was not a comprehensive penetration test.
+6. PostgreSQL Realtime subscriptions for order updates have not been implemented in the frontend.
+7. The prepared database migrations have not yet been validated against a clean Supabase environment.
 
-## 12. Conclusion
+## 13. Conclusion
 
 The main customer, restaurant-owner, and rider workflows were successfully exercised against the Supabase environment.
 
 The implementation also passed the tested concurrency and idempotency scenarios, the reviewed database permission-hardening regression checks, and the frontend lint and production-build checks.
+
+Cross-role order visibility was verified using database queries and dashboard refreshes. Native PostgreSQL Realtime subscription behaviour has not yet been implemented or verified.
 
 The remaining limitations are documented above so that the verification results accurately reflect the scope of testing performed.
