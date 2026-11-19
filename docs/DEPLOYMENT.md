@@ -286,3 +286,52 @@ Recommended workflow:
 The deployment procedure described in this document is the intended production deployment workflow.
 
 The Vercel production deployment and production-domain verification should be marked complete only after the application has actually been deployed and the production checks have passed.
+
+## Production Deployment Record
+
+### Deployment Details
+
+| Item | Value |
+|---|---|
+| Frontend hosting | Vercel |
+| Vercel project | `yumingo-assignment` |
+| Production URL | https://yumingo-assignment.vercel.app/ |
+| Source repository | https://github.com/Animesht1008/Yumingo_Assignment |
+| Production branch | `main` |
+| Backend | Hosted Supabase project |
+
+### Environment Variables
+
+The following variables are configured in Vercel:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+The frontend uses the Supabase publishable key. No service-role key is exposed to the browser.
+
+### Production Verification
+
+The deployed application was opened and manually tested against the hosted Supabase environment.
+
+Verified workflows:
+
+- Customer authentication and dashboard loading.
+- Restaurant discovery and menu retrieval.
+- Customer order history and order-status display.
+- Restaurant-owner authentication and dashboard loading.
+- Restaurant order listing and status display.
+- Rider authentication and dashboard loading.
+- Active and available delivery listings.
+- Rider pickup and delivery-status actions.
+
+The three application roles were successfully exercised on the production deployment.
+
+### Database Migration Note
+
+The version-controlled database migrations were validated against the local Supabase Docker environment. They were not applied to the hosted production database as part of this deployment process. The hosted database was separately used for application regression testing.
+
+### Deployment Status
+
+The Vercel production deployment is live and the customer, restaurant-owner, and rider application workflows have been manually verified.
+
+**Production URL:** https://yumingo-assignment.vercel.app/
