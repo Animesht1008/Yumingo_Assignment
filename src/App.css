@@ -1,0 +1,493 @@
+
+/* ============================================
+   YUMINGO - RESTAURANT DASHBOARD STYLES
+   ============================================ */
+
+
+/* ============================================
+   1. MAIN APPLICATION CONTAINER
+   ============================================ */
+
+.app-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+
+/* ============================================
+   2. APPLICATION HEADER
+   ============================================ */
+
+.app-header {
+  width: 100%;
+  min-height: 82px;
+  padding: 16px 5%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Yumingo brand name and icon */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.brand h1 {
+  font-size: 23px;
+  margin: 0;
+  color: var(--color-primary);
+  font-weight: 750;
+}
+
+.brand p {
+  font-size: 12px;
+  margin: 3px 0 0;
+  color: var(--color-muted);
+}
+
+/* Restaurant details and online indicator */
+
+.restaurant-info {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.restaurant-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.restaurant-details span {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* Restaurant online status */
+
+.online-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 20px;
+  background-color: #ecfdf3;
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #16a34a;
+  border-radius: 50%;
+}
+
+
+/* ============================================
+   3. MAIN DASHBOARD CONTENT
+   ============================================ */
+
+.dashboard-content {
+  width: 100%;
+  max-width: 1250px;
+  margin: 0 auto;
+  padding: 36px 32px;
+  flex: 1;
+}
+
+/* Dashboard title and description */
+
+.dashboard-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.dashboard-heading h2 {
+  font-size: 26px;
+  margin-bottom: 7px;
+  color: var(--color-text);
+}
+
+.dashboard-heading p {
+  font-size: 14px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.dashboard-date {
+  padding: 9px 14px;
+  border: 1px solid var(--color-border);
+  background-color: white;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+
+/* ============================================
+   4. ORDER SUMMARY CARDS
+   ============================================ */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 38px;
+}
+
+/* Common summary card styling */
+
+.summary-card {
+  padding: 22px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.025);
+}
+
+.summary-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.summary-card h3 {
+  font-size: 30px;
+  margin: 12px 0 5px;
+  color: var(--color-text);
+}
+
+.summary-card p {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* Different accent colors for order categories */
+
+.pending-card {
+  border-left: 4px solid var(--color-warning);
+}
+
+.preparing-card {
+  border-left: 4px solid var(--color-info);
+}
+
+.ready-card {
+  border-left: 4px solid var(--color-success);
+}
+
+
+/* ============================================
+   5. RECENT ORDERS SECTION
+   ============================================ */
+
+.orders-section {
+  width: 100%;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-heading h2 {
+  font-size: 21px;
+  margin-bottom: 6px;
+}
+
+.section-heading p {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.order-count {
+  padding: 7px 12px;
+  border-radius: 20px;
+  background-color: #eaf3ef;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+
+/* ============================================
+   6. INDIVIDUAL ORDER CARDS
+   ============================================ */
+
+.orders-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.order-card {
+  padding: 22px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.order-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+/* Order ID and customer information */
+
+.order-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.order-top h3 {
+  font-size: 16px;
+  margin-bottom: 5px;
+}
+
+.order-top p {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* Order status badge */
+
+.order-status {
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.order-status.new {
+  color: #92400e;
+  background-color: #fef3c7;
+}
+
+.order-status.accepted {
+  color: #1d4ed8;
+  background-color: #dbeafe;
+}
+
+.order-status.preparing {
+  color: #6d28d9;
+  background-color: #ede9fe;
+}
+
+.order-status.ready-for-pickup {
+  color: #166534;
+  background-color: #dcfce7;
+}
+
+/* Food items inside an order */
+
+.order-items {
+  margin: 20px 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.order-items p {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+/* Order amount and received time */
+
+.order-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.order-bottom strong {
+  font-size: 18px;
+  color: var(--color-text);
+}
+
+.order-bottom span {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+
+/* ============================================
+   7. ORDER ACTION BUTTONS
+   ============================================ */
+
+.order-actions {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
+/* Primary action button */
+
+.primary-button {
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.primary-button:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.primary-button:focus-visible {
+  outline: 3px solid #86c5a9;
+  outline-offset: 3px;
+}
+
+/* Message displayed when an order is ready */
+
+.waiting-message {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+
+/* ============================================
+   8. APPLICATION FOOTER
+   ============================================ */
+
+.app-footer {
+  padding: 20px;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+
+/* ============================================
+   9. RESPONSIVE DESIGN - TABLETS
+   ============================================ */
+
+@media (max-width: 900px) {
+
+  /* Display two summary cards per row */
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Display one order card per row */
+
+  .orders-list {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+
+/* ============================================
+   10. RESPONSIVE DESIGN - MOBILE DEVICES
+   ============================================ */
+
+@media (max-width: 600px) {
+
+  /* Reduce header spacing */
+
+  .app-header {
+    padding: 14px 18px;
+    align-items: flex-start;
+    gap: 15px;
+    flex-direction: column;
+  }
+
+  .restaurant-info {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  /* Reduce dashboard padding */
+
+  .dashboard-content {
+    padding: 26px 16px;
+  }
+
+  .dashboard-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dashboard-heading h2 {
+    font-size: 22px;
+  }
+
+  /* Summary cards */
+
+  .summary-grid {
+    gap: 10px;
+  }
+
+  .summary-card {
+    padding: 15px;
+  }
+
+  .summary-card h3 {
+    font-size: 25px;
+  }
+
+  /* Order section */
+
+  .section-heading {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .order-card {
+    padding: 17px;
+  }
+
+}
